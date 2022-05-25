@@ -1,0 +1,67 @@
+import re
+import os
+
+class MemDescr:
+  def __init__(self, name, start, length):
+    self.name = name
+    self.start = start
+    self.length = length
+
+# Выделяем память
+memory = [0] * 65536
+blocks = [MemDescr(None, 0, len(memory))]
+
+print('Команды:')
+print('b - Вывести список блоков')
+print('l <имя файла> - Загрузить файл в память')
+print('r <имя файла> - Удалить файл из памяти')
+
+while True:
+  command = input('> ')
+  if command == '':
+    continue
+  result = re.match(r'^(\S+)(?:\s+(.+?))?\s*$', command)
+  if result is None:
+    print('Неверная команда')
+    continue
+  c = result.group(1)
+  p = result.group(2)
+  if c == 'b':
+    print('%-20s %10s %10s' % ('Имя блока', 'Начало', 'Размер'))
+    for desc in blocks:
+      name = desc.name
+      if name is None:
+        name = '<Сводобно>'
+      print('%-20s %10d %10d' % (name, desc.start, desc.length))
+  elif c == 'l':
+    length = os.path.getsize(p)
+    lst = list(sorted(filter(lambda x: x[1].name is None and x[1].length >= length, enumerate(blocks)), key=lambda x: x[1].length))
+    if len(lst) == 0:
+      print('Недостаточно памяти')
+    i, desc = lst[0]
+    mem = MemDescr(p, desc.start, length)
+    desc.start += length
+    desc.length -= length
+    if desc.length == 0:
+      desc.name = p
+      desc.length = length
+    else:
+      blocks.insert(i, mem)
+  elif c == 'r':
+    for i, desc in enumerate(blocks):
+      if desc.name == p:
+        # Если предыдущий блок свободен - объединяем
+        if i > 0 and blocks[i-1].name is None:  
+          blocks[i-1].length += desc.length
+          del(blocks[i])
+          if i < len(blocks) and blocks[i].name is None:
+            blocks[i-1].length += blocks[i].length
+            blocks[i-1].name = None
+            del (blocks[i])
+        elif i + 1 < len(blocks) and blocks[i+1].name is None:
+            desc.length += blocks[i+1].length
+            desc.name = None
+            del(blocks[i+1])
+        else:
+          desc.name = None
+        break
